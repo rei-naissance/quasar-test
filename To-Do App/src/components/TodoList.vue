@@ -43,7 +43,7 @@
     </q-banner>
 
     <q-list v-if="!isLoading" bordered separator dark class="rounded-borders">
-      <q-item v-for="todo in todos" :key="todo.id" dark>
+      <q-item v-for="todo in todos" :key="todo.localId" dark>
         <q-item-section avatar>
           <q-checkbox v-model="todo.completed" @update:model-value="updateTask(todo)" color="primary" />
         </q-item-section>
@@ -87,7 +87,7 @@
         </q-item-section>
       </q-item>
 
-      <q-item v-if="todos.length === 0 && !isLoading" dark>
+      <q-item v-if="todos.length === 0" dark>
         <q-item-section class="text-center q-py-xl">
           <div class="text-h4 text-white q-mb-md">Get ready to conquer the day</div>
         </q-item-section>
@@ -100,10 +100,13 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 
+// Use local ID instead since placeholder API only gives back the most recent ID.
+
+let nextId = 1000
 const todos = ref([])
 const newTask = ref('')
-const isLoading = ref(false)
 const isAddingTask = ref(false)
+const isLoading = ref(false)
 const error = ref(null)
 
 const fetchTasks = async () => {
@@ -111,8 +114,9 @@ const fetchTasks = async () => {
   error.value = null
   try {
     const response = await axios.get('https://jsonplaceholder.typicode.com/todos')
-    todos.value = response.data.slice(0, 3).map(todo => ({
+    todos.value = response.data.slice(0, 10).map(todo => ({
       ...todo,
+      localId: nextId++,
       editing: false,
       isDeleting: false
     }))
@@ -137,6 +141,7 @@ const addTask = async () => {
     
     todos.value.unshift({
       ...response.data,
+      localId: nextId++,
       editing: false,
       isDeleting: false
     })
@@ -157,7 +162,6 @@ const updateTask = async (todo) => {
     })
   } catch (error) {
     console.error('Failed to update task:', error)
-    todo.completed = !todo.completed
   }
 }
 
@@ -165,7 +169,10 @@ const deleteTask = async (todo) => {
   todo.isDeleting = true
   try {
     await axios.delete(`https://jsonplaceholder.typicode.com/todos/${todo.id}`)
-    todos.value = todos.value.filter(t => t.id !== todo.id)
+    const index = todos.value.findIndex(t => t.localId === todo.localId) // Use localId for reliable deletion
+    if (index !== -1) {
+      todos.value.splice(index, 1)
+    }
   } catch (error) {
     console.error('Failed to delete task:', error)
   } finally {
